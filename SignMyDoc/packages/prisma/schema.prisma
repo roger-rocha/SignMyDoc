@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IdentityProvider {
+  DOCUMENSO
+  GOOGLE
+}
+
+model User {
+  id                 Int                  @id @default(autoincrement())
+  name               String?
+  email              String               @unique
+  emailVerified      DateTime?
+  password           String?
+  source             String?
+  identityProvider   IdentityProvider     @default(DOCUMENSO)
+  accounts           Account[]
+  sessions           Session[]
+  Document           Document[]
+  Subscription       Subscription[]
+  PasswordResetToken PasswordResetToken[]
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  INACTIVE
+}
+
+model Subscription {
+  id         Int                @id @default(autoincrement())
+  status     SubscriptionStatus @default(INACTIVE)
+  planId     String?
+  priceId    String?
+  customerId String?
+  periodEnd  DateTime?
+  userId     Int
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId])
+  @@index([userId])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       Int
+  expires      DateTime
+  user         User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum DocumentStatus {
+  DRAFT
+  PENDING
+  COMPLETED
+}
+
+model Document {
+  id        Int            @id @default(autoincrement())
+  created   DateTime       @default(now())
+  userId    Int
+  User      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  status    DocumentStatus @default(DRAFT)
+  document  String
+  Recipient Recipient[]
+  Field     Field[]
+}
+
+enum ReadStatus {
+  NOT_OPENED
+  OPENED
+}
+
+enum SendStatus {
+  NOT_SENT
+  SENT
+}
+
+enum SigningStatus {
+  NOT_SIGNED
+  SIGNED
+}
+
+model Recipient {
+  id            Int           @id @default(autoincrement())
+  documentId    Int
+  email         String        @db.VarChar(255)
+  name          String        @default("") @db.VarChar(255)
+  token         String
+  expired       DateTime?
+  signedAt      DateTime?
+  readStatus    ReadStatus    @default(NOT_OPENED)
+  signingStatus SigningStatus @default(NOT_SIGNED)
+  sendStatus    SendStatus    @default(NOT_SENT)
+  Document      Document      @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  Field         Field[]
+  Signature     Signature[]
+}
+
+enum FieldType {
+  SIGNATURE
+  FREE_SIGNATURE
+  DATE
+  TEXT
+}
+
+model Field {
+  id          Int        @id @default(autoincrement())
+  documentId  Int
+  recipientId Int?
+  type        FieldType
+  page        Int
+  positionX   Int        @default(0)
+  positionY   Int        @default(0)
+  customText  String
+  inserted    Boolean
+  Document    Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  Recipient   Recipient? @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  Signature   Signature?
+}
+
+model Signature {
+  id                     Int      @id @default(autoincrement())
+  created                DateTime @default(now())
+  recipientId            Int
+  fieldId                Int      @unique
+  signatureImageAsBase64 String?
+  typedSignature         String?
+
+  Recipient Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  Field     Field     @relation(fields: [fieldId], references: [id], onDelete: Restrict)
+}
+
+model PasswordResetToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiry    DateTime
+  userId    Int
+  User      User     @relation(fields: [userId], references: [id])
+}
