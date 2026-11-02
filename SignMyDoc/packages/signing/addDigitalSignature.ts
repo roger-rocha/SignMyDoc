@@ -5,12 +5,17 @@ import { PDFDocument, PDFHexString, PDFName, PDFNumber, PDFString } from "pdf-li
 const signer = require("./node-signpdf/dist/signpdf");
 
 export const addDigitalSignature = async (documentAsBase64: string): Promise<string> => {
+  const certificatePath = process.env.CERT_FILE_PATH;
+  if (!certificatePath) {
+    throw new Error("CERT_FILE_PATH must point to a private signing certificate");
+  }
+
   // Custom code to add Byterange to PDF
   const PDFArrayCustom = require("./PDFArrayCustom");
   const pdfBuffer = Buffer.from(documentAsBase64, "base64");
   const p12Buffer = Buffer.from(
     fs
-      .readFileSync(process.env.CERT_FILE_PATH || "resources/certificate.p12")
+      .readFileSync(certificatePath)
       .toString(process.env.CERT_FILE_ENCODING ? undefined : "binary"),
     (process.env.CERT_FILE_ENCODING as BufferEncoding) || "binary"
   );
